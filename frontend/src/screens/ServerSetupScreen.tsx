@@ -9,7 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Keyboard
+  Keyboard,
+  StyleSheet
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -112,115 +113,235 @@ const ServerSetupScreen: React.FC = () => {
   };
   
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-background"
-    >
-      <ScrollView className="flex-1">
-        <View className="p-4">
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
           {/* Network Status */}
           {!isWifiConnected && (
-            <View className="bg-warning/20 p-4 rounded-lg mb-4">
-              <Text className="text-warning font-semibold">
+            <View style={styles.warningBox}>
+              <Text style={styles.warningText}>
                 Not connected to Wi-Fi. Connect to your home network to set up the server.
               </Text>
             </View>
           )}
           
           {/* Info Card */}
-          <View className="bg-card rounded-lg p-4 shadow-sm mb-6">
-            <Text className="text-lg font-semibold text-text mb-2">Server Setup</Text>
-            <Text className="text-text/70 mb-4">
-              Enter the IP address and port of your iClood server. This should be the Raspberry Pi running
-              on your home network.
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Server Setup</Text>
+            <Text style={styles.cardDescription}>
+              Configure your home server's IP address and port to enable secure photo backup.
             </Text>
-            
-            <View className="flex-row items-center bg-primary/5 p-2 rounded-lg mb-4">
+
+            <View style={styles.ipBox}>
               <Ionicons name="information-circle" size={20} color="#3498db" />
-              <Text className="text-text/70 ml-2">
-                Make sure your server is running and you're connected to the same Wi-Fi network.
+              <Text style={styles.ipBoxText}>
+                Make sure your device is connected to the same network as your server.
               </Text>
             </View>
           </View>
           
           {/* Server Settings */}
-          <View className="bg-card rounded-lg p-4 shadow-sm mb-6">
-            <Text className="font-medium text-text mb-2">Server IP Address</Text>
+          <View style={styles.card}>
+            <Text style={styles.inputLabel}>Server IP Address</Text>
             <TextInput
-              className="bg-background p-3 rounded-lg border border-gray-200 mb-4"
-              placeholder="192.168.1.10"
+              style={styles.input}
               value={serverIP}
               onChangeText={setServerIP}
-              keyboardType="numbers-and-punctuation"
-              autoCapitalize="none"
-              editable={!isLoading}
+              placeholder="e.g. 192.168.1.100"
+              keyboardType="numeric"
             />
             
             {/* IP Suggestions */}
             {ipAddresses.length > 0 && (
-              <View className="flex-row flex-wrap mb-4">
-                <Text className="text-xs text-text/60 w-full mb-2">Suggested IP prefixes:</Text>
+              <View style={styles.ipSuggestions}>
+                <Text style={styles.ipSuggestionsLabel}>Suggested IP prefixes:</Text>
                 {ipAddresses.map((ip, index) => (
                   <TouchableOpacity
                     key={index}
-                    className="bg-primary/10 mr-2 mb-2 py-1 px-2 rounded"
+                    style={styles.ipSuggestionButton}
                     onPress={() => handleSuggestedIPPress(ip)}
                   >
-                    <Text className="text-primary text-sm">{ip}</Text>
+                    <Text style={styles.ipSuggestionText}>{ip}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             )}
             
-            <Text className="font-medium text-text mb-2">Port</Text>
+            <Text style={styles.inputLabel}>Port</Text>
             <TextInput
-              className="bg-background p-3 rounded-lg border border-gray-200 mb-2"
-              placeholder="8080"
+              style={styles.input}
               value={serverPort}
               onChangeText={setServerPort}
-              keyboardType="number-pad"
-              editable={!isLoading}
+              placeholder="e.g. 3000"
+              keyboardType="numeric"
             />
-            <Text className="text-xs text-text/60 mb-4">
-              The default port is 8080 unless you changed it in your server configuration.
+            <Text style={styles.helperText}>
+              The default port is 3000. Only change this if you've configured your server to use a different port.
             </Text>
             
             <TouchableOpacity
-              className="bg-primary p-4 rounded-lg flex-row justify-center items-center"
+              style={[styles.button, isLoading && styles.buttonDisabled]}
               onPress={handleConnect}
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="white" />
               ) : (
-                <>
-                  <Ionicons name="link" size={20} color="white" />
-                  <Text className="text-white font-semibold ml-2">
-                    Connect to Server
-                  </Text>
-                </>
+                <Ionicons name="save-outline" size={20} color="white" />
               )}
+              <Text style={styles.buttonText}>
+                {isLoading ? 'Saving...' : 'Save Configuration'}
+              </Text>
             </TouchableOpacity>
           </View>
           
           {/* Help Text */}
-          <View className="bg-card rounded-lg p-4 shadow-sm mb-6">
-            <Text className="font-medium text-text mb-2">Need Help?</Text>
-            <Text className="text-text/70 mb-2">
-              The IP address of your Raspberry Pi can typically be found by:
+          <View style={styles.card}>
+            <Text style={styles.inputLabel}>Need Help?</Text>
+            <Text style={styles.helpText}>
+              To find your Raspberry Pi's IP address, follow these steps:
             </Text>
-            <View className="bg-background p-3 rounded-lg">
-              <Text className="font-mono text-xs text-text/70">
-                1. On your Raspberry Pi, run: <Text className="text-primary">hostname -I</Text>{'\n'}
-                2. Check your router's connected devices list{'\n'}
-                3. Use a network scanner app on your phone
+            <View style={styles.codeBlock}>
+              <Text style={styles.codeText}>
+                1. On your Raspberry Pi, run: <Text style={styles.codeCommand}>hostname -I</Text>{'\n'}
+                2. The first IP address shown is your server's IP
               </Text>
             </View>
           </View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f7fa',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+  },
+  warningBox: {
+    backgroundColor: 'rgba(243, 156, 18, 0.2)',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  warningText: {
+    color: '#f39c12',
+    fontWeight: '600',
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    marginBottom: 24,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  cardDescription: {
+    color: 'rgba(44, 62, 80, 0.7)',
+    marginBottom: 16,
+  },
+  ipBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(52, 152, 219, 0.05)',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  ipBoxText: {
+    color: 'rgba(44, 62, 80, 0.7)',
+    marginLeft: 8,
+  },
+  inputLabel: {
+    fontWeight: '500',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#f5f7fa',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  ipSuggestions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  ipSuggestionsLabel: {
+    fontSize: 12,
+    color: 'rgba(44, 62, 80, 0.6)',
+    width: '100%',
+    marginBottom: 8,
+  },
+  ipSuggestionButton: {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    marginRight: 8,
+    marginBottom: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  ipSuggestionText: {
+    color: '#3498db',
+    fontSize: 14,
+  },
+  helperText: {
+    fontSize: 12,
+    color: 'rgba(44, 62, 80, 0.6)',
+    marginBottom: 16,
+  },
+  button: {
+    backgroundColor: '#3498db',
+    padding: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  helpText: {
+    color: 'rgba(44, 62, 80, 0.7)',
+    marginBottom: 8,
+  },
+  codeBlock: {
+    backgroundColor: '#f5f7fa',
+    padding: 12,
+    borderRadius: 8,
+  },
+  codeText: {
+    fontFamily: 'monospace',
+    fontSize: 12,
+    color: 'rgba(44, 62, 80, 0.7)',
+  },
+  codeCommand: {
+    color: '#3498db',
+  },
+});
 
 export default ServerSetupScreen; 
