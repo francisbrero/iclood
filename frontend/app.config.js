@@ -12,14 +12,22 @@ module.exports = {
     "**/*"
   ],
   ios: {
-    supportsTablet: true
+    supportsTablet: true,
+    bundleIdentifier: "com.iclood.app"
   },
   android: {
     adaptiveIcon: {
       backgroundColor: "#ffffff"
-    }
+    },
+    package: "com.iclood.app"
   },
   web: {
   },
-  sdkVersion: "52.0.0"
+  sdkVersion: "52.0.0",
+  // Enable New Architecture
+  experiments: {
+    tsconfigPaths: true
+  },
+  // This is required for the new architecture
+  newArchEnabled: true
 }; 
