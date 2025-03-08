@@ -1,0 +1,19 @@
+[Binary shortcut file will be generated from the Shortcuts app using these actions]
+
+1. Comment: "iClood Photo Backup"
+2. Dictionary {
+    "server_url": "http://192.168.1.100:5001"
+    "album_name": "iClood Backup"
+}
+3. Find Photos where 
+   - not in Album "iClood Backup"
+   - sort by Date Taken
+   - limit 50
+4. Repeat with each photo:
+   Get Details of photo
+   Upload to URL "{{Dictionary.server_url}}/api/v1/media/upload"
+   If success:
+     Add to Album "iClood Backup"
+   Otherwise:
+     Show error notification
+5. Show completion notification 

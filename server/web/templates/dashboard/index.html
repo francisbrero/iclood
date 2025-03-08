@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- System Status Card -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
+                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">System Status</dt>
+                        <dd class="flex items-baseline">
+                            <div class="text-2xl font-semibold text-gray-900">${ status }</div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Devices Card -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Active Devices</dt>
+                        <dd class="flex items-baseline">
+                            <div class="text-2xl font-semibold text-gray-900">${ activeDevices }</div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Usage Card -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-purple-500 rounded-md p-3">
+                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1.5 3 3 3h10c1.5 0 3-1 3-3V7c0-2-1.5-3-3-3H7C5.5 4 4 5 4 7z"></path>
+                    </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Storage Usage</dt>
+                        <dd class="flex items-baseline">
+                            <div class="text-2xl font-semibold text-gray-900">${ storageUsed } / ${ storageTotal }</div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Backups Table -->
+    <div class="col-span-full bg-white shadow rounded-lg mt-6">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Recent Backups</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Files</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-for="backup in recentBackups" :key="backup.id">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${ backup.device_name }</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span :class="getStatusClass(backup.status)" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                    ${ backup.status }
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ backup.files_processed }</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ formatSize(backup.total_size) }</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ formatDate(backup.start_time) }</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const { createApp } = Vue
+
+createApp({
+    delimiters: ['${', '}'],
+    data() {
+        return {
+            status: 'Operational',
+            activeDevices: 0,
+            storageUsed: '0 GB',
+            storageTotal: '0 GB',
+            recentBackups: []
+        }
+    },
+    methods: {
+        async fetchData() {
+            try {
+                const [systemRes, backupsRes] = await Promise.all([
+                    fetch('/api/v1/system/status'),
+                    fetch('/api/v1/backup/recent')
+                ])
+                
+                const systemData = await systemRes.json()
+                const backupsData = await backupsRes.json()
+                
+                this.status = systemData.data.status
+                this.activeDevices = systemData.data.active_devices
+                this.storageUsed = this.formatSize(systemData.data.storage.used)
+                this.storageTotal = this.formatSize(systemData.data.storage.total)
+                this.recentBackups = backupsData.data.backups
+            } catch (error) {
+                console.error('Error fetching data:', error)
+            }
+        },
+        getStatusClass(status) {
+            return {
+                'completed': 'bg-green-100 text-green-800',
+                'in_progress': 'bg-blue-100 text-blue-800',
+                'failed': 'bg-red-100 text-red-800'
+            }[status] || 'bg-gray-100 text-gray-800'
+        },
+        formatSize(bytes) {
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+            if (bytes === 0) return '0 B'
+            const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)))
+            return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i]
+        },
+        formatDate(date) {
+            return new Date(date).toLocaleString()
+        }
+    },
+    mounted() {
+        this.fetchData()
+        setInterval(this.fetchData, 30000) // Refresh every 30 seconds
+    }
+}).mount('#app')
+</script>
+{% endblock %} 

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="app" class="space-y-6">
+    <!-- Shortcuts Status -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-medium mb-4">Shortcuts Status</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Connected Devices -->
+            <div class="border rounded p-4">
+                <h3 class="font-medium mb-2">Connected Devices</h3>
+                <ul class="space-y-2">
+                    <li v-for="device in devices" :key="device.id" class="flex justify-between">
+                        <span>${ device.name }</span>
+                        <span class="text-gray-500">${ formatDate(device.last_backup) }</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- Recent Backups -->
+            <div class="border rounded p-4">
+                <h3 class="font-medium mb-2">Recent Backups</h3>
+                <ul class="space-y-2">
+                    <li v-for="backup in recentBackups" :key="backup.id" class="flex justify-between">
+                        <span>${ backup.device_name }</span>
+                        <span class="text-gray-500">${ backup.files_count } files</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Setup Instructions -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-medium mb-4">Shortcut Setup</h2>
+        <ol class="list-decimal list-inside space-y-2">
+            <li>Install the iClood shortcut from the link below</li>
+            <li>Open Shortcuts app and find "iClood Backup"</li>
+            <li>Edit the shortcut to set your server URL: ${ serverUrl }</li>
+            <li>Set up automation for automatic backups</li>
+        </ol>
+        <div class="mt-4">
+            <a href="/shortcuts/download" class="text-blue-600 hover:text-blue-800">
+                Download iClood Shortcut
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const { createApp } = Vue
+
+createApp({
+    delimiters: ['${', '}'],
+    data() {
+        return {
+            devices: [],
+            recentBackups: [],
+            serverUrl: window.location.origin
+        }
+    },
+    methods: {
+        async fetchData() {
+            const res = await fetch('/api/v1/shortcuts/status')
+            const data = await res.json()
+            this.devices = data.devices
+            this.recentBackups = data.recent_backups
+        },
+        formatDate(date) {
+            return new Date(date).toLocaleString()
+        }
+    },
+    mounted() {
+        this.fetchData()
+        setInterval(this.fetchData, 30000)
+    }
+}).mount('#app')
+</script>
+{% endblock %} 

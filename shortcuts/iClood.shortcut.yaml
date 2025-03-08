@@ -1,0 +1,44 @@
+# This is a representation of the shortcut structure
+Name: iClood Backup
+Input: none
+Actions:
+  - GetPhotos:
+      filter: not backed up
+      limit: 50
+      sortBy: dateCreated
+      sortOrder: newest first
+  
+  - RepeatWithEach:
+      input: Photos
+      actions:
+        - GetDetails:
+            of: RepeatItem
+            get: 
+              - filename
+              - creationDate
+              - metadata
+        
+        - UploadToServer:
+            url: "http://[SERVER_IP]:5001/api/v1/media/upload"
+            method: POST
+            headers:
+              Content-Type: multipart/form-data
+            body:
+              file: RepeatItem
+              device_id: "{{Device Name}}"
+              metadata: "{{RepeatItem Details}}"
+        
+        - If:
+            condition: "{{Upload Result}} is Success"
+            then:
+              - AddToAlbum:
+                  photo: RepeatItem
+                  album: "iClood Backup"
+            else:
+              - ShowNotification:
+                  title: "Backup Failed"
+                  body: "Failed to backup {{RepeatItem Filename}}"
+
+  - ShowNotification:
+      title: "iClood Backup Complete"
+      body: "Successfully backed up {{Backed Up Count}} photos" 

@@ -1,0 +1,28 @@
+/* Additional custom styles can be added here */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-badge.operational {
+    background-color: #DEF7EC;
+    color: #03543F;
+}
+
+.status-badge.warning {
+    background-color: #FEF3C7;
+    color: #92400E;
+}
+
+.status-badge.error {
+    background-color: #FEE2E2;
+    color: #991B1B;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+} 
