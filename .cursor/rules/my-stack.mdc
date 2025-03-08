@@ -1,0 +1,15 @@
+---
+description: This is the project's preferred tech stack
+globs: 
+alwaysApply: false
+---
+
+
+- iPhone App: Expo (React Native) with Tailwind for styling
+- Backend: Python 3.12 (Flask API) running on a Raspberry Pi
+- Database: PostgreSQL (for tracking backups)
+- Storage: External HDD connected to the Raspberry Pi
+- Frontend Needs: React.js for potential web dashboard
+- Tests: python test
+
+If you need to use another technology, please ask me and update this file accordingly if we decide to use it.
