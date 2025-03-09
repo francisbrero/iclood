@@ -1,42 +1,70 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-type RootStackParamList = {
-  ServerSetup: undefined;
-};
-
-type NoServerConnectionNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const NoServerConnection: React.FC = () => {
-  const navigation = useNavigation<NoServerConnectionNavigationProp>();
-  
-  const handleSetupPress = () => {
-    navigation.navigate('ServerSetup');
+  const navigation = useNavigation();
+
+  const handleGoToSettings = () => {
+    navigation.navigate('Settings' as never);
   };
-  
+
   return (
-    <View className="bg-card rounded-lg p-6 shadow-sm my-4 items-center">
-      <Ionicons name="server-outline" size={64} color="#95a5a6" />
-      
-      <Text className="text-lg font-semibold text-text mt-4 text-center">
-        No Server Connection
+    <View style={styles.container}>
+      <View style={styles.iconContainer}>
+        <Ionicons name="cloud-offline-outline" size={40} color="#EF4444" />
+      </View>
+      <Text style={styles.title}>No Server Connection</Text>
+      <Text style={styles.message}>
+        We couldn't connect to your server. Please check your server settings and try again.
       </Text>
-      
-      <Text className="text-text/70 text-center mt-2">
-        You need to connect to your iClood server to back up your photos and videos.
-      </Text>
-      
-      <TouchableOpacity
-        className="bg-primary mt-6 py-3 px-6 rounded-full"
-        onPress={handleSetupPress}
-      >
-        <Text className="text-white font-semibold">Set Up Server</Text>
+      <TouchableOpacity style={styles.button} onPress={handleGoToSettings}>
+        <Text style={styles.buttonText}>Go to Settings</Text>
       </TouchableOpacity>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#334155',
+    textAlign: 'center',
+  },
+  message: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  button: {
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+});
 
 export default NoServerConnection; 

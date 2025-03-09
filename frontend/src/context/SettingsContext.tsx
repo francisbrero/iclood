@@ -29,7 +29,7 @@ const defaultSettings: SettingsState = {
   autoBackup: true,
   wifiOnlyBackup: true,
   chargingOnlyBackup: false,
-  storageLimit: 90, // percentage of storage to use
+  storageLimit: 99, // percentage of storage to use
   originalQuality: true,
   backgroundRefresh: true,
   refreshInterval: 60, // minutes
@@ -111,16 +111,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return false;
       }
 
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
       // Ping the server
       const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/ping`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        // Short timeout for ping
-        signal: AbortSignal.timeout(3000),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       const isReachable = response.status === 200;
       setIsServerReachable(isReachable);
       return isReachable;

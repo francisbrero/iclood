@@ -18,30 +18,90 @@ A local-only iCloud alternative for photo and video backups, designed for person
 ## Setup Instructions
 
 ### Backend Setup
+
+#### Local Development (Mac)
+1. Clone the repository and navigate to the backend directory
+   ```bash
+   git clone https://github.com/yourusername/iclood.git
+   cd iclood/backend
+   ```
+
+2. Create and activate a virtual environment
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Install dependencies
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Install and set up PostgreSQL
+   ```bash
+   # Install PostgreSQL
+   brew install postgresql@14
+
+   # Remove existing data directory (if any) and initialize fresh
+   rm -rf /usr/local/var/postgresql@14
+   initdb /usr/local/var/postgresql@14
+
+   # Start PostgreSQL service
+   brew services start postgresql@14
+
+   # Create database and user
+   createdb iclood
+   psql iclood -c "CREATE USER iclooduser WITH PASSWORD 'iclood123';"
+   psql iclood -c "GRANT ALL PRIVILEGES ON DATABASE iclood TO iclooduser;"
+   ```
+
+5. Create local storage directory and copy the environment file
+   ```bash
+   # Create local storage directory
+   mkdir -p ~/iclood_backups
+
+   # Copy the example environment file
+   cp .env.example .env
+   ```
+   Make sure your `.env` file has these configurations:
+   ```
+   # Database URL
+   DATABASE_URL=postgresql://iclooduser:iclood123@localhost:5432/iclood
+   
+   # Local storage path (for development)
+   UPLOAD_FOLDER=~/iclood_backups
+   
+   # Other settings
+   SECRET_KEY=your_secret_key_here
+   FLASK_APP=run.py
+   FLASK_ENV=development
+   MAX_FILE_SIZE=1000
+   ```
+
+6. Configure macOS Firewall
+   The Flask server needs to be accessible from other devices on your network:
+   1. Go to System Settings -> Network -> Firewall
+   2. Click "Options..." or "Firewall Options..."
+   3. Either:
+      - Temporarily disable the firewall for development, OR
+      - Add Python/Flask to the allowed apps list
+
+7. Run the Flask application
+   ```bash
+   python run.py
+   ```
+   The server will be accessible at `http://<your-ip>:8080`
+
+#### Production Setup (Raspberry Pi)
 1. Set up Python and PostgreSQL on your Raspberry Pi
    ```bash
    sudo apt update
    sudo apt install python3-pip python3-venv postgresql postgresql-contrib
    ```
 
-2. Clone the repository and navigate to the backend directory
-   ```bash
-   git clone https://github.com/yourusername/iclood.git
-   cd iclood/backend
-   ```
+2. Follow steps 1-3 from the Local Development section
 
-3. Create and activate a virtual environment
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-4. Install dependencies
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. Create a PostgreSQL database
+3. Create a PostgreSQL database
    ```bash
    sudo -u postgres psql
    postgres=# CREATE DATABASE iclood;
@@ -50,13 +110,13 @@ A local-only iCloud alternative for photo and video backups, designed for person
    postgres=# \q
    ```
 
-6. Copy the example environment file and update it with your database credentials
+4. Copy and configure the environment file
    ```bash
    cp .env.example .env
    # Edit .env with your database credentials and storage path
    ```
 
-7. Run the Flask application
+5. Run the Flask application
    ```bash
    python run.py
    ```
@@ -97,7 +157,7 @@ A local-only iCloud alternative for photo and video backups, designed for person
 
 6. Configure the app
    - Once the app is running, go to the Settings tab
-   - Tap "Configure Server" and enter the IP address of your Raspberry Pi
+   - Tap "Configure Server" and enter your server's IP address
    - The default port is 8080 unless you changed it in your backend configuration
 
 ## Development
@@ -123,9 +183,13 @@ expo build:ios
 ```
 
 ## Troubleshooting
-- If you can't connect to the server, make sure your iPhone and Raspberry Pi are on the same Wi-Fi network
+- If you can't connect to the server, make sure your iPhone and development machine are on the same Wi-Fi network
 - Check that the Flask server is running and accessible from other devices on your network
-- Verify that your Raspberry Pi's firewall allows connections on the port you're using (default: 8080)
+- For macOS development: You may need to allow incoming connections through your firewall:
+  1. Go to System Settings -> Network -> Firewall
+  2. Click "Options..." or "Firewall Options..."
+  3. Either temporarily disable the firewall or add Python/Flask to the allowed apps
+- For production: verify that your Raspberry Pi's firewall allows connections on the port you're using (default: 8080)
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.

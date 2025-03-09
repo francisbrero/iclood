@@ -3,6 +3,11 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from dotenv import load_dotenv
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -14,8 +19,14 @@ def create_app(test_config=None):
     # Create and configure the app
     app = Flask(__name__, instance_relative_config=True)
     
-    # Enable CORS
-    CORS(app)
+    # Enable CORS with specific settings
+    CORS(app, resources={
+        r"/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
     
     # Configure the app
     if test_config is None:
@@ -29,6 +40,8 @@ def create_app(test_config=None):
             UPLOAD_FOLDER=os.environ.get('UPLOAD_FOLDER', '/mnt/external_drive/iclood_backups'),
             MAX_CONTENT_LENGTH=1000 * 1024 * 1024,  # 1000MB max-limit for uploads
         )
+        logger.info(f"Server configured with DATABASE_URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
+        logger.info(f"Upload folder set to: {app.config['UPLOAD_FOLDER']}")
     else:
         # Load the test config if passed in
         app.config.from_mapping(test_config)
@@ -52,5 +65,6 @@ def create_app(test_config=None):
     # Create tables in the database
     with app.app_context():
         db.create_all()
+        logger.info("Database tables created successfully")
     
     return app 

@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as Device from 'expo-device';
-import { Alert } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import { useSettings } from './SettingsContext';
 
 // Types for media assets
@@ -11,7 +11,7 @@ interface MediaAsset {
   uri: string;
   path: string;
   filename: string;
-  fileSize: number;
+  fileSize?: number;
   creationTime: number;
   modificationTime: number;
   mediaType: 'photo' | 'video';
@@ -37,18 +37,27 @@ interface BackupProgress {
   percentage: number;
 }
 
+interface StorageUsage {
+  used_bytes: number;
+  total_bytes: number;
+  available_bytes: number;
+}
+
 interface BackupContextType {
   newAssets: MediaAsset[];
   selectedAssets: MediaAsset[];
   backupStats: BackupStats;
   backupProgress: BackupProgress;
-  loadNewAssets: () => Promise<void>;
+  loadNewAssets: (limit?: number, offset?: number) => Promise<boolean>;
   toggleAssetSelection: (id: string) => void;
   selectAllAssets: () => void;
   deselectAllAssets: () => void;
   startBackup: () => Promise<void>;
   cancelBackup: () => void;
   ignoreAssets: (assetIds: string[]) => Promise<void>;
+  fetchStorageUsage: () => Promise<StorageUsage>;
+  fetchBackupStats: () => Promise<BackupStats>;
+  fetchBackupHistory: () => Promise<any[]>;
 }
 
 const initialBackupStats: BackupStats = {
@@ -72,13 +81,16 @@ const BackupContext = createContext<BackupContextType>({
   selectedAssets: [],
   backupStats: initialBackupStats,
   backupProgress: initialBackupProgress,
-  loadNewAssets: async () => {},
+  loadNewAssets: async () => false,
   toggleAssetSelection: () => {},
   selectAllAssets: () => {},
   deselectAllAssets: () => {},
   startBackup: async () => {},
   cancelBackup: () => {},
   ignoreAssets: async () => {},
+  fetchStorageUsage: async () => ({ used_bytes: 0, total_bytes: 0, available_bytes: 0 }),
+  fetchBackupStats: async () => initialBackupStats,
+  fetchBackupHistory: async () => [],
 });
 
 export const useBackup = () => useContext(BackupContext);
@@ -99,8 +111,10 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [isServerReachable]);
 
   // Fetch backup stats from the server
-  const fetchBackupStats = async () => {
-    if (!settings.serverIP || !isServerReachable) return;
+  const fetchBackupStats = async (): Promise<BackupStats> => {
+    if (!settings.serverIP || !isServerReachable) {
+      return initialBackupStats;
+    }
 
     try {
       const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/storage/status`, {
@@ -113,89 +127,126 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (response.ok) {
         const data = await response.json();
         if (data.status === 'success') {
-          setBackupStats({
+          const stats = {
             totalFiles: data.backups.total_count || 0,
             totalSize: data.backups.total_size_bytes || 0,
             photosCount: data.backups.photo_count || 0,
             videosCount: data.backups.video_count || 0,
             lastBackupTime: data.backups.last_backup || null,
-          });
+          };
+          setBackupStats(stats);
+          return stats;
         }
       }
     } catch (error) {
       console.error('Failed to fetch backup stats:', error);
     }
+
+    return initialBackupStats;
   };
 
   // Function to load new assets from the device
-  const loadNewAssets = async () => {
+  const loadNewAssets = async (limit = 20, offset = 0) => {
     try {
-      // Get media library permission
+      // Request media library permissions
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission required', 'Please grant access to your media library to use this app.');
-        return;
+        Alert.alert(
+          'Permission Required',
+          'Please grant access to your photos to use the backup feature.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+          ]
+        );
+        return false;
       }
 
-      // Get all assets
+      // Get all assets with pagination
       const fetchedAssets = await MediaLibrary.getAssetsAsync({
         mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
         sortBy: [['creationTime', false]],
-        first: 100, // Limit to the most recent 100 assets for performance
+        first: limit,
+        after: offset > 0 ? offset.toString() : undefined
       });
 
-      // Prepare assets data
+      // Get detailed info for each asset
       const assetsData: MediaAsset[] = await Promise.all(
         fetchedAssets.assets.map(async (asset) => {
           const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
+          // Get the proper URI that works on iOS
+          let properUri = asset.uri;
+          if (Platform.OS === 'ios') {
+            try {
+              // Convert ph:// URL to a local file URL
+              const localUri = await MediaLibrary.getAssetInfoAsync(asset);
+              if (localUri.localUri) {
+                properUri = localUri.localUri;
+              }
+            } catch (error) {
+              console.error('Error getting local URI:', error);
+            }
+          }
+          
           return {
             id: asset.id,
-            uri: asset.uri,
-            path: assetInfo.localUri || asset.uri,
+            uri: properUri,
+            path: assetInfo.localUri || properUri,
             filename: asset.filename,
-            fileSize: asset.fileSize || 0,
+            fileSize: 0,
             creationTime: asset.creationTime,
             modificationTime: asset.modificationTime,
             mediaType: asset.mediaType === 'video' ? 'video' : 'photo',
             duration: asset.duration,
             width: asset.width,
             height: asset.height,
-            selected: true, // Default to selected
+            selected: true
           };
         })
       );
 
-      // Check which assets need to be backed up
+      // If this is the first page, replace the assets
+      // Otherwise, append the new assets
+      if (offset === 0) {
+        setNewAssets(assetsData);
+        setSelectedAssets(assetsData);
+      } else {
+        setNewAssets(prev => [...prev, ...assetsData]);
+        setSelectedAssets(prev => [...prev, ...assetsData]);
+      }
+
+      // If server is reachable, check which assets need backup
       if (isServerReachable && settings.serverIP) {
         try {
           const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/photos/new`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              device_id: Device.modelName,
+              device_id: Device.modelName || 'unknown',
               files: assetsData.map(asset => ({
                 id: asset.id,
                 path: asset.path,
                 name: asset.filename,
                 size: asset.fileSize,
                 type: asset.mediaType,
-                created: asset.creationTime,
-              })),
-            }),
+                created: asset.creationTime
+              }))
+            })
           });
 
           if (response.ok) {
             const data = await response.json();
             if (data.status === 'success') {
               const newFileIds = new Set(data.new_files.map((file: any) => file.id));
-              
-              // Filter assets that need to be backed up
               const assetsToBackup = assetsData.filter(asset => newFileIds.has(asset.id));
-              setNewAssets(assetsToBackup);
-              setSelectedAssets(assetsToBackup);
-              return;
+              
+              if (offset === 0) {
+                setNewAssets(assetsToBackup);
+                setSelectedAssets(assetsToBackup);
+              } else {
+                setNewAssets(prev => [...prev, ...assetsToBackup]);
+                setSelectedAssets(prev => [...prev, ...assetsToBackup]);
+              }
             }
           }
         } catch (error) {
@@ -203,32 +254,36 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      // If server is not reachable or API call failed, set all assets as new
-      setNewAssets(assetsData);
-      setSelectedAssets(assetsData);
+      return fetchedAssets.hasNextPage;
     } catch (error) {
       console.error('Error loading assets:', error);
-      Alert.alert('Error', 'Failed to load media files');
+      Alert.alert('Error', 'Failed to load your photos and videos. Please try again.');
+      return false;
     }
   };
 
   // Function to toggle asset selection
   const toggleAssetSelection = (id: string) => {
+    const asset = newAssets.find(a => a.id === id);
+    if (!asset) return;
+
     setNewAssets(prevAssets =>
       prevAssets.map(asset => {
         if (asset.id === id) {
-          const newSelected = !asset.selected;
-          // Update selected assets array
-          if (newSelected) {
-            setSelectedAssets(prev => [...prev, asset]);
-          } else {
-            setSelectedAssets(prev => prev.filter(a => a.id !== id));
-          }
-          return { ...asset, selected: newSelected };
+          return { ...asset, selected: !asset.selected };
         }
         return asset;
       })
     );
+
+    setSelectedAssets(prev => {
+      const isCurrentlySelected = prev.some(a => a.id === id);
+      if (isCurrentlySelected) {
+        return prev.filter(a => a.id !== id);
+      } else {
+        return [...prev, asset];
+      }
+    });
   };
 
   // Function to select all assets
@@ -236,7 +291,8 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNewAssets(prevAssets =>
       prevAssets.map(asset => ({ ...asset, selected: true }))
     );
-    setSelectedAssets(newAssets);
+    // Use newAssets directly instead of the stale state
+    setSelectedAssets([...newAssets]);
   };
 
   // Function to deselect all assets
@@ -387,6 +443,56 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Function to fetch storage usage
+  const fetchStorageUsage = async (): Promise<StorageUsage> => {
+    if (!settings.serverIP || !isServerReachable) {
+      throw new Error('Server is not reachable');
+    }
+
+    const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/storage/usage`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch storage usage');
+    }
+
+    const data = await response.json();
+    return {
+      used_bytes: data.used_bytes || 0,
+      total_bytes: data.total_bytes || 0,
+      available_bytes: data.available_bytes || 0,
+    };
+  };
+
+  // Function to fetch backup history
+  const fetchBackupHistory = async (): Promise<any[]> => {
+    if (!settings.serverIP || !isServerReachable) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/backup/history`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.history || [];
+      }
+    } catch (error) {
+      console.error('Failed to fetch backup history:', error);
+    }
+
+    return [];
+  };
+
   return (
     <BackupContext.Provider
       value={{
@@ -401,6 +507,9 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         startBackup,
         cancelBackup,
         ignoreAssets,
+        fetchStorageUsage,
+        fetchBackupStats: fetchBackupStats,
+        fetchBackupHistory,
       }}
     >
       {children}
