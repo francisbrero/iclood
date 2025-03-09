@@ -1,12 +1,17 @@
 import React from 'react';
-import { View, Image, TouchableOpacity, Text } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Types
 import { MediaAsset } from '../context/BackupContext';
 
 interface MediaItemProps {
-  asset: MediaAsset;
+  asset: {
+    id: string;
+    uri: string;
+    mediaType: 'photo' | 'video';
+    duration?: number;
+  };
   isSelected: boolean;
   onToggleSelection: () => void;
 }
@@ -22,13 +27,13 @@ const MediaItem: React.FC<MediaItemProps> = ({ asset, isSelected, onToggleSelect
     >
       <Image
         source={{ uri: asset.uri }}
-        className="w-full h-full rounded-md"
+        className="w-full h-full rounded-2xl"
         resizeMode="cover"
       />
       
       {/* Selection indicator */}
       <View 
-        className={`absolute top-2 right-2 w-6 h-6 rounded-full justify-center items-center ${
+        className={`absolute top-2 right-2 w-8 h-8 rounded-full justify-center items-center ${
           isSelected ? 'bg-primary' : 'bg-black/50'
         }`}
       >
@@ -41,8 +46,8 @@ const MediaItem: React.FC<MediaItemProps> = ({ asset, isSelected, onToggleSelect
       
       {/* Video indicator */}
       {isVideo && (
-        <View className="absolute bottom-2 left-2 flex-row items-center">
-          <Ionicons name="videocam" size={16} color="white" />
+        <View className="absolute bottom-2 left-2 flex-row items-center bg-black/50 px-2 py-1 rounded-full">
+          <Ionicons name="videocam" size={14} color="white" />
           {asset.duration && (
             <Text className="text-white text-xs ml-1">
               {Math.floor(asset.duration / 60)}:{(asset.duration % 60).toString().padStart(2, '0')}

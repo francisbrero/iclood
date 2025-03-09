@@ -1,138 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  RefreshControl,
-  ActivityIndicator,
-  TouchableOpacity
-} from 'react-native';
+import React from 'react';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useIsFocused } from '@react-navigation/native';
-
-// Contexts
-import { useSettings } from '../context/SettingsContext';
-import { useBackup } from '../context/BackupContext';
-
-// Components
 import StorageUsageBar from '../components/StorageUsageBar';
 import BackupHistoryItem from '../components/BackupHistoryItem';
 import NoServerConnection from '../components/NoServerConnection';
+import { formatDateTime } from '../utils/formatting';
+import { useStorageScreen } from '../hooks/useStorageScreen';
+import { BackupHistoryItem as BackupHistoryItemType } from '../types';
 
-// Helpers
-import { formatDateTime, formatFileSize } from '../utils/formatting';
+interface StorageWarning {
+  warningMessage: string;
+  warningColor: 'error' | 'warning';
+}
 
 const StorageScreen: React.FC = () => {
-  const isFocused = useIsFocused();
-  const { settings, isServerReachable, checkServerConnection } = useSettings();
-  const { backupStats, loadNewAssets } = useBackup();
-  
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [storageUsage, setStorageUsage] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [backupHistory, setBackupHistory] = useState<any[]>([]);
-  
-  // Refresh data when screen is focused
-  useEffect(() => {
-    if (isFocused) {
-      fetchStorageData();
-    }
-  }, [isFocused, isServerReachable]);
-  
-  // Fetch storage data from server
-  const fetchStorageData = async () => {
-    if (!isServerReachable || !settings.serverIP) {
-      setIsLoading(false);
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    try {
-      // Fetch storage status
-      const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/storage/status`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === 'success') {
-          setStorageUsage(data.storage);
-          
-          // Calculate space used by iClood
-          const iCloodSize = data.backups.total_size_bytes || 0;
-          setStorageUsage(prev => ({
-            ...prev,
-            icloud_used_bytes: iCloodSize,
-            icloud_used_human: formatFileSize(iCloodSize),
-            icloud_percent: prev?.total_bytes ? Math.round((iCloodSize / prev.total_bytes) * 100) : 0,
-          }));
-        }
-      }
-      
-      // Fetch backup history
-      const historyResponse = await fetch(`http://${settings.serverIP}:${settings.serverPort}/backup/log?limit=10`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (historyResponse.ok) {
-        const historyData = await historyResponse.json();
-        if (historyData.status === 'success') {
-          setBackupHistory(historyData.backups || []);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch storage data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Handle refresh
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await checkServerConnection();
-    await fetchStorageData();
-    setIsRefreshing(false);
-  };
-  
-  // Calculate warning level based on storage usage
-  const getWarningLevel = (): 'normal' | 'warning' | 'critical' => {
-    if (!storageUsage) return 'normal';
-    
-    const usagePercent = storageUsage.usage_percent;
-    if (usagePercent >= 90) return 'critical';
-    if (usagePercent >= settings.storageLimit) return 'warning';
-    return 'normal';
-  };
-  
-  // Render storage warning message
-  const renderStorageWarning = () => {
-    const warningLevel = getWarningLevel();
-    
-    if (warningLevel === 'normal') return null;
-    
-    const isBackupDisabled = warningLevel === 'critical';
-    const warningColor = warningLevel === 'critical' ? 'error' : 'warning';
-    const warningMessage = isBackupDisabled 
-      ? 'Storage is critically full. Backups are disabled.'
-      : `Storage is almost full (above ${settings.storageLimit}%). Consider freeing up space.`;
-    
-    return (
-      <View className={`bg-${warningColor}/20 p-4 rounded-lg mb-4`}>
-        <Text className={`text-${warningColor} font-semibold`}>
-          {warningMessage}
-        </Text>
-      </View>
-    );
-  };
-  
+  const {
+    isLoading,
+    isRefreshing,
+    isServerReachable,
+    settings,
+    storageUsage,
+    backupStats,
+    backupHistory,
+    handleRefresh,
+    renderStorageWarning
+  } = useStorageScreen();
+
   // Render content
   const renderContent = () => {
     if (!isServerReachable || !settings.serverIP) {
@@ -141,41 +34,67 @@ const StorageScreen: React.FC = () => {
     
     if (isLoading) {
       return (
-        <View className="flex-1 justify-center items-center p-8">
-          <ActivityIndicator size="large" color="#3498db" />
-          <Text className="text-text mt-4 text-center">Loading storage information...</Text>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#0066FF" />
+          <Text style={styles.loadingText}>Loading storage information...</Text>
         </View>
       );
     }
     
     if (!storageUsage) {
       return (
-        <View className="flex-1 justify-center items-center p-8">
-          <Ionicons name="cloud-offline-outline" size={64} color="#95a5a6" />
-          <Text className="text-text text-lg font-semibold mt-4 text-center">
-            Storage information unavailable
+        <View style={styles.centerContainer}>
+          <View style={styles.errorIconContainer}>
+            <Ionicons name="cloud-offline-outline" size={40} color="#EF4444" />
+          </View>
+          <Text style={styles.errorTitle}>
+            Storage Information Unavailable
           </Text>
-          <Text className="text-text/70 text-center mt-2">
-            We couldn't retrieve storage information from your server.
+          <Text style={styles.errorMessage}>
+            We couldn't retrieve storage information from your server
           </Text>
           <TouchableOpacity
-            className="bg-primary mt-6 py-3 px-6 rounded-full"
+            style={styles.retryButton}
             onPress={handleRefresh}
           >
-            <Text className="text-white font-semibold">Retry</Text>
+            <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
       );
     }
+
+    const warning = renderStorageWarning();
     
     return (
-      <>
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={['#0066FF']}
+            tintColor="#0066FF"
+          />
+        }
+      >
         {/* Storage Warning */}
-        {renderStorageWarning()}
+        {warning && (
+          <View style={[styles.warningContainer, { backgroundColor: warning.warningColor === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)' }]}>
+            <Text style={[styles.warningText, { color: warning.warningColor === 'error' ? '#EF4444' : '#F59E0B' }]}>
+              {warning.warningMessage}
+            </Text>
+          </View>
+        )}
         
         {/* Storage Usage Card */}
-        <View className="bg-card rounded-lg p-4 shadow-sm mb-4">
-          <Text className="text-lg font-semibold text-text mb-4">Storage Usage</Text>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.iconContainer}>
+              <Ionicons name="pie-chart-outline" size={20} color="#0066FF" />
+            </View>
+            <Text style={styles.cardTitle}>Storage Usage</Text>
+          </View>
           
           <StorageUsageBar
             totalSpace={storageUsage.total_bytes}
@@ -184,48 +103,53 @@ const StorageScreen: React.FC = () => {
             warningThreshold={settings.storageLimit}
           />
           
-          <View className="flex-row justify-between mt-4">
+          <View style={styles.statsContainer}>
             <View>
-              <Text className="text-xs text-text/60">Used</Text>
-              <Text className="font-medium">{storageUsage.used_human}</Text>
+              <Text style={styles.statLabel}>Used</Text>
+              <Text style={styles.statValue}>{storageUsage.used_human}</Text>
             </View>
             <View>
-              <Text className="text-xs text-text/60">iClood</Text>
-              <Text className="font-medium">{storageUsage.icloud_used_human}</Text>
+              <Text style={styles.statLabel}>iClood</Text>
+              <Text style={[styles.statValue, styles.primaryText]}>{storageUsage.icloud_used_human}</Text>
             </View>
             <View>
-              <Text className="text-xs text-text/60">Free</Text>
-              <Text className="font-medium">{storageUsage.free_human}</Text>
+              <Text style={styles.statLabel}>Free</Text>
+              <Text style={styles.statValue}>{storageUsage.free_human}</Text>
             </View>
             <View>
-              <Text className="text-xs text-text/60">Total</Text>
-              <Text className="font-medium">{storageUsage.total_human}</Text>
+              <Text style={styles.statLabel}>Total</Text>
+              <Text style={styles.statValue}>{storageUsage.total_human}</Text>
             </View>
           </View>
         </View>
         
         {/* Backup Stats Card */}
-        <View className="bg-card rounded-lg p-4 shadow-sm mb-4">
-          <Text className="text-lg font-semibold text-text mb-4">Backup Statistics</Text>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.iconContainer}>
+              <Ionicons name="stats-chart-outline" size={20} color="#0066FF" />
+            </View>
+            <Text style={styles.cardTitle}>Backup Statistics</Text>
+          </View>
           
-          <View className="flex-row justify-between">
-            <View className="items-center flex-1">
-              <Text className="text-primary text-3xl font-bold">{backupStats.totalFiles}</Text>
-              <Text className="text-text/60 text-sm">Total Files</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statBlock}>
+              <Text style={styles.statNumber}>{backupStats.totalFiles}</Text>
+              <Text style={styles.statLabel}>Total Files</Text>
             </View>
-            <View className="items-center flex-1">
-              <Text className="text-secondary text-3xl font-bold">{backupStats.photosCount}</Text>
-              <Text className="text-text/60 text-sm">Photos</Text>
+            <View style={styles.statBlock}>
+              <Text style={styles.statNumber}>{backupStats.photosCount}</Text>
+              <Text style={styles.statLabel}>Photos</Text>
             </View>
-            <View className="items-center flex-1">
-              <Text className="text-accent text-3xl font-bold">{backupStats.videosCount}</Text>
-              <Text className="text-text/60 text-sm">Videos</Text>
+            <View style={styles.statBlock}>
+              <Text style={styles.statNumber}>{backupStats.videosCount}</Text>
+              <Text style={styles.statLabel}>Videos</Text>
             </View>
           </View>
           
-          <View className="mt-4 pt-4 border-t border-gray-100">
-            <Text className="text-text/60 text-sm">Last Backup</Text>
-            <Text className="font-medium">
+          <View style={styles.lastBackupContainer}>
+            <Text style={styles.statLabel}>Last Backup</Text>
+            <Text style={styles.statValue}>
               {backupStats.lastBackupTime 
                 ? formatDateTime(new Date(backupStats.lastBackupTime))
                 : 'Never'}
@@ -234,11 +158,16 @@ const StorageScreen: React.FC = () => {
         </View>
         
         {/* Recent Backups Card */}
-        <View className="bg-card rounded-lg p-4 shadow-sm mb-4">
-          <Text className="text-lg font-semibold text-text mb-4">Recent Backups</Text>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.iconContainer}>
+              <Ionicons name="time-outline" size={20} color="#0066FF" />
+            </View>
+            <Text style={styles.cardTitle}>Recent Backups</Text>
+          </View>
           
           {backupHistory.length > 0 ? (
-            backupHistory.map((backup, index) => (
+            backupHistory.map((backup: BackupHistoryItemType, index: number) => (
               <BackupHistoryItem
                 key={backup.id}
                 fileName={backup.file_name}
@@ -249,30 +178,149 @@ const StorageScreen: React.FC = () => {
               />
             ))
           ) : (
-            <View className="py-4 items-center">
-              <Text className="text-text/60">No recent backups found</Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No recent backups found</Text>
             </View>
           )}
         </View>
-      </>
+      </ScrollView>
     );
   };
   
-  return (
-    <ScrollView 
-      className="flex-1 bg-background p-4"
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={handleRefresh}
-          colors={['#3498db']}
-          tintColor="#3498db"
-        />
-      }
-    >
-      {renderContent()}
-    </ScrollView>
-  );
+  return renderContent();
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  contentContainer: {
+    padding: 24,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#334155',
+    textAlign: 'center',
+  },
+  errorIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#334155',
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 102, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+  },
+  statBlock: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#334155',
+    marginTop: 4,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0066FF',
+  },
+  primaryText: {
+    color: '#0066FF',
+  },
+  lastBackupContainer: {
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  emptyContainer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#64748B',
+  },
+  warningContainer: {
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 24,
+  },
+  warningText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+});
 
 export default StorageScreen; 

@@ -178,76 +178,124 @@ const HomeScreen: React.FC = () => {
       
       {/* Backup progress bar */}
       {backupProgress.inProgress && (
-        <BackupProgressBar
-          progress={backupProgress.percentage}
-          fileName={backupProgress.currentFileName}
-          currentFile={backupProgress.currentFile}
-          totalFiles={backupProgress.totalFiles}
-          onCancel={cancelBackup}
-        />
-      )}
-      
-      {/* Control buttons */}
-      {newAssets.length > 0 && !backupProgress.inProgress && (
-        <View className="flex-row justify-between items-center p-4">
-          <View className="flex-row space-x-2">
-            <TouchableOpacity
-              className="bg-primary/10 p-2 rounded-full"
-              onPress={selectAllAssets}
-            >
-              <Ionicons name="checkmark-circle" size={22} color="#3498db" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="bg-primary/10 p-2 rounded-full"
-              onPress={deselectAllAssets}
-            >
-              <Ionicons name="close-circle" size={22} color="#e74c3c" />
-            </TouchableOpacity>
-          </View>
-          
-          <View className="flex-row space-x-2">
-            <TouchableOpacity
-              className="bg-error p-2 px-4 rounded-full"
-              onPress={handleIgnoreSelected}
-            >
-              <Text className="text-white text-sm font-semibold">Ignore Selected</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="bg-primary p-2 px-4 rounded-full"
-              onPress={handleStartBackup}
-              disabled={!isServerReachable || selectedAssets.length === 0}
-            >
-              <Text className="text-white text-sm font-semibold">
-                Back Up ({selectedAssets.length})
-              </Text>
-            </TouchableOpacity>
+        <View className="px-6 pt-6">
+          <View className="bg-primary-50 p-6 rounded-2xl">
+            <View className="flex-row justify-between items-center mb-4">
+              <View className="flex-row items-center">
+                <View className="w-10 h-10 rounded-full bg-white justify-center items-center mr-4">
+                  <Ionicons name="cloud-upload-outline" size={20} color="#0066FF" />
+                </View>
+                <View>
+                  <Text className="text-lg font-semibold text-primary">Backing up...</Text>
+                  <Text className="text-sm text-text-secondary mt-1">
+                    {backupProgress.currentFile} of {backupProgress.totalFiles} files
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                className="w-8 h-8 rounded-full bg-white justify-center items-center"
+                onPress={cancelBackup}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text className="text-sm text-text-secondary mb-3" numberOfLines={1} ellipsizeMode="middle">
+              {backupProgress.currentFileName}
+            </Text>
+            
+            <View className="h-2 bg-white rounded-full overflow-hidden">
+              <View 
+                className="h-full bg-primary rounded-full" 
+                style={{ width: `${backupProgress.percentage}%` }} 
+              />
+            </View>
           </View>
         </View>
       )}
       
-      {/* Photo/video grid */}
-      <FlatList
-        data={newAssets}
-        renderItem={({ item }) => (
-          <MediaItem
-            asset={item}
-            isSelected={!!item.selected}
-            onToggleSelection={() => toggleAssetSelection(item.id)}
-          />
+      {/* Main content */}
+      <View className="flex-1 px-6 pt-6">
+        <View className="flex-row justify-between items-center mb-6">
+          <Text className="text-2xl font-bold text-text">Your Photos</Text>
+          <View className="flex-row items-center">
+            <TouchableOpacity
+              className="w-10 h-10 rounded-full bg-primary-50 justify-center items-center mr-2"
+              onPress={selectAllAssets}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="#0066FF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="w-10 h-10 rounded-full bg-error/10 justify-center items-center"
+              onPress={deselectAllAssets}
+            >
+              <Ionicons name="close-circle" size={20} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {newAssets.length > 0 ? (
+          <>
+            <Text className="text-text-secondary mb-4">
+              Select photos to back up to your storage server
+            </Text>
+            
+            <View className="flex-row flex-wrap -mx-1">
+              {newAssets.map(asset => (
+                <MediaItem
+                  key={asset.id}
+                  asset={asset}
+                  isSelected={selectedAssets.includes(asset)}
+                  onToggleSelection={() => toggleAssetSelection(asset.id)}
+                />
+              ))}
+            </View>
+            
+            {selectedAssets.length > 0 && (
+              <View className="absolute bottom-6 left-6 right-6 flex-row space-x-3">
+                <TouchableOpacity
+                  className="flex-1 bg-error/10 p-4 rounded-2xl flex-row justify-center items-center"
+                  onPress={handleIgnoreSelected}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                  <Text className="text-error font-semibold ml-2">
+                    Ignore Selected
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  className="flex-1 bg-primary p-4 rounded-2xl flex-row justify-center items-center"
+                  onPress={handleStartBackup}
+                  disabled={!isServerReachable}
+                >
+                  <Ionicons name="cloud-upload-outline" size={20} color="white" />
+                  <Text className="text-white font-semibold ml-2">
+                    Back Up ({selectedAssets.length})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        ) : (
+          <View className="flex-1 justify-center items-center">
+            <View className="w-20 h-20 rounded-full bg-success/10 justify-center items-center mb-4">
+              <Ionicons name="checkmark" size={40} color="#10B981" />
+            </View>
+            <Text className="text-xl font-semibold text-text text-center">
+              All Caught Up!
+            </Text>
+            <Text className="text-text-secondary text-center mt-2 mb-6">
+              There are no new photos or videos to back up
+            </Text>
+            <TouchableOpacity
+              className="bg-primary-50 px-6 py-3 rounded-full"
+              onPress={handleRefresh}
+            >
+              <Text className="text-primary font-semibold">Check Again</Text>
+            </TouchableOpacity>
+          </View>
         )}
-        keyExtractor={item => item.id}
-        numColumns={3}
-        contentContainerStyle={{ padding: 2 }}
-        ListEmptyComponent={renderEmptyState}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            colors={['#3498db']}
-            tintColor="#3498db"
-          />
-        }
-      />
+      </View>
     </View>
   );
 };

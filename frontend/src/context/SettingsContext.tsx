@@ -29,7 +29,7 @@ const defaultSettings: SettingsState = {
   autoBackup: true,
   wifiOnlyBackup: true,
   chargingOnlyBackup: false,
-  storageLimit: 90, // percentage of storage to use
+  storageLimit: 99, // percentage of storage to use
   originalQuality: true,
   backgroundRefresh: true,
   refreshInterval: 60, // minutes
