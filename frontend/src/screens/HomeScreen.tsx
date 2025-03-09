@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -7,7 +7,9 @@ import {
   TouchableOpacity, 
   ActivityIndicator,
   Alert,
-  RefreshControl
+  RefreshControl,
+  Dimensions,
+  StyleSheet
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +23,9 @@ import { useBackup } from '../context/BackupContext';
 import BackupProgressBar from '../components/BackupProgressBar';
 import NoServerConnection from '../components/NoServerConnection';
 import MediaItem from '../components/MediaItem';
+
+// Calculate number of columns based on screen width
+const numColumns = Math.floor(Dimensions.get('window').width / 120); // Assuming each item is ~120px wide
 
 const HomeScreen: React.FC = () => {
   const isFocused = useIsFocused();
@@ -41,18 +46,26 @@ const HomeScreen: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isWifiConnected, setIsWifiConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const ITEMS_PER_PAGE = 20;
   
-  // Check network and load assets when the screen is focused
+  // Check network and load initial assets when the screen is focused
   useEffect(() => {
     if (isFocused) {
-      checkNetworkAndLoadAssets();
+      setPage(1);
+      setHasMore(true);
+      checkNetworkAndLoadAssets(1);
     }
   }, [isFocused]);
   
-  // Check Wi-Fi connection and load assets
-  const checkNetworkAndLoadAssets = async () => {
+  // Check network and load assets
+  const checkNetworkAndLoadAssets = async (currentPage: number) => {
     try {
-      setIsLoading(true);
+      if (currentPage === 1) {
+        setIsLoading(true);
+      }
       
       // Check if we're on Wi-Fi
       const networkState = await Network.getNetworkStateAsync();
@@ -63,22 +76,46 @@ const HomeScreen: React.FC = () => {
         await checkServerConnection();
       }
       
-      // Load new assets
-      await loadNewAssets();
+      // Load new assets with pagination
+      const hasNextPage = await loadNewAssets(ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE);
+      setHasMore(hasNextPage);
     } catch (error) {
       console.error('Error checking network:', error);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
   
   // Handle pull-to-refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await checkNetworkAndLoadAssets();
+    setPage(1);
+    setHasMore(true);
+    await checkNetworkAndLoadAssets(1);
     setIsRefreshing(false);
   };
   
+  // Handle loading more items
+  const handleLoadMore = async () => {
+    if (!isLoadingMore && hasMore && !isLoading) {
+      setIsLoadingMore(true);
+      const nextPage = page + 1;
+      setPage(nextPage);
+      await checkNetworkAndLoadAssets(nextPage);
+    }
+  };
+  
+  // Render footer loader
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={{ paddingVertical: 20 }}>
+        <ActivityIndicator size="large" color="#0066FF" />
+      </View>
+    );
+  };
+
   // Start backup process
   const handleStartBackup = () => {
     if (selectedAssets.length === 0) {
@@ -113,8 +150,8 @@ const HomeScreen: React.FC = () => {
   const renderServerStatusMessage = () => {
     if (!isWifiConnected) {
       return (
-        <View className="bg-warning/20 p-4 rounded-lg mb-4">
-          <Text className="text-warning font-semibold">
+        <View style={styles.warningContainer}>
+          <Text style={styles.warningText}>
             Not connected to Wi-Fi. Connect to your home network to back up photos.
           </Text>
         </View>
@@ -127,11 +164,11 @@ const HomeScreen: React.FC = () => {
     
     if (!isServerReachable) {
       return (
-        <View className="bg-error/20 p-4 rounded-lg mb-4">
-          <Text className="text-error font-semibold">
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
             Cannot connect to server at {settings.serverIP}:{settings.serverPort}.
           </Text>
-          <Text className="text-error mt-1">
+          <Text style={styles.errorSubtext}>
             Make sure your server is running and you're on the same network.
           </Text>
         </View>
@@ -145,88 +182,63 @@ const HomeScreen: React.FC = () => {
   const renderEmptyState = () => {
     if (isLoading) {
       return (
-        <View className="flex-1 justify-center items-center p-8">
+        <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#3498db" />
-          <Text className="text-text mt-4 text-center">Loading your photos and videos...</Text>
+          <Text style={styles.loadingText}>Loading your photos and videos...</Text>
         </View>
       );
     }
     
     return (
-      <View className="flex-1 justify-center items-center p-8">
+      <View style={styles.centerContainer}>
         <Ionicons name="checkmark-circle" size={64} color="#2ecc71" />
-        <Text className="text-text text-lg font-semibold mt-4 text-center">
+        <Text style={styles.emptyTitle}>
           All caught up!
         </Text>
-        <Text className="text-text/70 text-center mt-2">
+        <Text style={styles.emptySubtext}>
           There are no new photos or videos to back up.
         </Text>
         <TouchableOpacity
-          className="bg-primary mt-6 py-3 px-6 rounded-full"
+          style={styles.refreshButton}
           onPress={handleRefresh}
         >
-          <Text className="text-white font-semibold">Refresh</Text>
+          <Text style={styles.refreshButtonText}>Refresh</Text>
         </TouchableOpacity>
       </View>
     );
   };
   
   return (
-    <View className="flex-1 bg-background">
+    <View style={styles.container}>
       {/* Server status message */}
       {renderServerStatusMessage()}
       
       {/* Backup progress bar */}
       {backupProgress.inProgress && (
-        <View className="px-6 pt-6">
-          <View className="bg-primary-50 p-6 rounded-2xl">
-            <View className="flex-row justify-between items-center mb-4">
-              <View className="flex-row items-center">
-                <View className="w-10 h-10 rounded-full bg-white justify-center items-center mr-4">
-                  <Ionicons name="cloud-upload-outline" size={20} color="#0066FF" />
-                </View>
-                <View>
-                  <Text className="text-lg font-semibold text-primary">Backing up...</Text>
-                  <Text className="text-sm text-text-secondary mt-1">
-                    {backupProgress.currentFile} of {backupProgress.totalFiles} files
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                className="w-8 h-8 rounded-full bg-white justify-center items-center"
-                onPress={cancelBackup}
-              >
-                <Ionicons name="close" size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            
-            <Text className="text-sm text-text-secondary mb-3" numberOfLines={1} ellipsizeMode="middle">
-              {backupProgress.currentFileName}
-            </Text>
-            
-            <View className="h-2 bg-white rounded-full overflow-hidden">
-              <View 
-                className="h-full bg-primary rounded-full" 
-                style={{ width: `${backupProgress.percentage}%` }} 
-              />
-            </View>
-          </View>
+        <View style={styles.progressContainer}>
+          <BackupProgressBar 
+            currentFile={backupProgress.currentFile}
+            totalFiles={backupProgress.totalFiles}
+            currentFileName={backupProgress.currentFileName}
+            percentage={backupProgress.percentage}
+            onCancel={cancelBackup}
+          />
         </View>
       )}
       
       {/* Main content */}
-      <View className="flex-1 px-6 pt-6">
-        <View className="flex-row justify-between items-center mb-6">
-          <Text className="text-2xl font-bold text-text">Your Photos</Text>
-          <View className="flex-row items-center">
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Your Photos</Text>
+          <View style={styles.headerButtons}>
             <TouchableOpacity
-              className="w-10 h-10 rounded-full bg-primary-50 justify-center items-center mr-2"
+              style={[styles.headerButton, styles.selectButton]}
               onPress={selectAllAssets}
             >
               <Ionicons name="checkmark-circle" size={20} color="#0066FF" />
             </TouchableOpacity>
             <TouchableOpacity
-              className="w-10 h-10 rounded-full bg-error/10 justify-center items-center"
+              style={[styles.headerButton, styles.deselectButton]}
               onPress={deselectAllAssets}
             >
               <Ionicons name="close-circle" size={20} color="#EF4444" />
@@ -236,68 +248,199 @@ const HomeScreen: React.FC = () => {
 
         {newAssets.length > 0 ? (
           <>
-            <Text className="text-text-secondary mb-4">
+            <Text style={styles.subtitle}>
               Select photos to back up to your storage server
             </Text>
             
-            <View className="flex-row flex-wrap -mx-1">
-              {newAssets.map(asset => (
+            <FlatList
+              data={newAssets}
+              renderItem={({ item }) => (
                 <MediaItem
-                  key={asset.id}
-                  asset={asset}
-                  isSelected={selectedAssets.includes(asset)}
-                  onToggleSelection={() => toggleAssetSelection(asset.id)}
+                  key={item.id}
+                  asset={item}
+                  isSelected={item.selected || false}
+                  onToggleSelection={() => toggleAssetSelection(item.id)}
                 />
-              ))}
-            </View>
-            
-            {selectedAssets.length > 0 && (
-              <View className="absolute bottom-6 left-6 right-6 flex-row space-x-3">
-                <TouchableOpacity
-                  className="flex-1 bg-error/10 p-4 rounded-2xl flex-row justify-center items-center"
-                  onPress={handleIgnoreSelected}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                  <Text className="text-error font-semibold ml-2">
-                    Ignore Selected
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  className="flex-1 bg-primary p-4 rounded-2xl flex-row justify-center items-center"
-                  onPress={handleStartBackup}
-                  disabled={!isServerReachable}
-                >
-                  <Ionicons name="cloud-upload-outline" size={20} color="white" />
-                  <Text className="text-white font-semibold ml-2">
-                    Back Up ({selectedAssets.length})
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              )}
+              keyExtractor={item => item.id}
+              numColumns={numColumns}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                />
+              }
+              onEndReached={handleLoadMore}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={renderFooter}
+              columnWrapperStyle={styles.row}
+            />
           </>
         ) : (
-          <View className="flex-1 justify-center items-center">
-            <View className="w-20 h-20 rounded-full bg-success/10 justify-center items-center mb-4">
-              <Ionicons name="checkmark" size={40} color="#10B981" />
-            </View>
-            <Text className="text-xl font-semibold text-text text-center">
-              All Caught Up!
-            </Text>
-            <Text className="text-text-secondary text-center mt-2 mb-6">
-              There are no new photos or videos to back up
-            </Text>
-            <TouchableOpacity
-              className="bg-primary-50 px-6 py-3 rounded-full"
-              onPress={handleRefresh}
-            >
-              <Text className="text-primary font-semibold">Check Again</Text>
-            </TouchableOpacity>
-          </View>
+          renderEmptyState()
         )}
       </View>
+      
+      {/* Bottom buttons */}
+      {newAssets.length > 0 && (
+        <View style={styles.bottomButtons}>
+          <TouchableOpacity
+            style={styles.ignoreButton}
+            onPress={handleIgnoreSelected}
+          >
+            <Ionicons name="trash-outline" size={24} color="#EF4444" />
+            <Text style={styles.ignoreButtonText}>Ignore Selected</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.backupButton}
+            onPress={handleStartBackup}
+          >
+            <Text style={styles.backupButtonText}>
+              Back Up ({selectedAssets.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 16,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  selectButton: {
+    backgroundColor: '#EFF6FF',
+  },
+  deselectButton: {
+    backgroundColor: '#FEE2E2',
+  },
+  row: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  progressContainer: {
+    padding: 16,
+  },
+  bottomButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: 'white',
+  },
+  ignoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  ignoreButtonText: {
+    color: '#EF4444',
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  backupButton: {
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  backupButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  warningContainer: {
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    marginBottom: 16,
+  },
+  warningText: {
+    color: '#92400E',
+    fontWeight: '600',
+  },
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
+    padding: 16,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#B91C1C',
+    fontWeight: '600',
+  },
+  errorSubtext: {
+    color: '#B91C1C',
+    marginTop: 4,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    color: '#1F2937',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    color: '#64748B',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  refreshButton: {
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 24,
+  },
+  refreshButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+});
 
 export default HomeScreen; 

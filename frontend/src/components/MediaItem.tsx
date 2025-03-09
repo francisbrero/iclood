@@ -1,9 +1,7 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Image, Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-// Types
-import { MediaAsset } from '../context/BackupContext';
+import * as MediaLibrary from 'expo-media-library';
 
 interface MediaItemProps {
   asset: {
@@ -18,25 +16,49 @@ interface MediaItemProps {
 
 const MediaItem: React.FC<MediaItemProps> = ({ asset, isSelected, onToggleSelection }) => {
   const isVideo = asset.mediaType === 'video';
+  const [imageError, setImageError] = useState(false);
+  const [imageUri, setImageUri] = useState(asset.uri);
+
+  // Handle iOS photo URLs
+  React.useEffect(() => {
+    const loadProperUri = async () => {
+      if (Platform.OS === 'ios' && asset.uri.startsWith('ph://')) {
+        try {
+          const assetInfo = await MediaLibrary.getAssetInfoAsync(asset.id);
+          if (assetInfo.localUri) {
+            setImageUri(assetInfo.localUri);
+          }
+        } catch (error) {
+          console.error('Error getting local URI:', error);
+          setImageError(true);
+        }
+      }
+    };
+
+    loadProperUri();
+  }, [asset.uri, asset.id]);
   
   return (
     <TouchableOpacity 
-      className="relative flex-1 m-1 aspect-square"
+      style={styles.container}
       onPress={onToggleSelection}
       activeOpacity={0.7}
     >
-      <Image
-        source={{ uri: asset.uri }}
-        className="w-full h-full rounded-2xl"
-        resizeMode="cover"
-      />
+      {imageError ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="image" size={32} color="#64748B" />
+        </View>
+      ) : (
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.image}
+          resizeMode="cover"
+          onError={() => setImageError(true)}
+        />
+      )}
       
       {/* Selection indicator */}
-      <View 
-        className={`absolute top-2 right-2 w-8 h-8 rounded-full justify-center items-center ${
-          isSelected ? 'bg-primary' : 'bg-black/50'
-        }`}
-      >
+      <View style={[styles.selectionIndicator, isSelected ? styles.selectedIndicator : styles.unselectedIndicator]}>
         {isSelected ? (
           <Ionicons name="checkmark" size={16} color="white" />
         ) : (
@@ -46,10 +68,10 @@ const MediaItem: React.FC<MediaItemProps> = ({ asset, isSelected, onToggleSelect
       
       {/* Video indicator */}
       {isVideo && (
-        <View className="absolute bottom-2 left-2 flex-row items-center bg-black/50 px-2 py-1 rounded-full">
+        <View style={styles.videoIndicator}>
           <Ionicons name="videocam" size={14} color="white" />
           {asset.duration && (
-            <Text className="text-white text-xs ml-1">
+            <Text style={styles.duration}>
               {Math.floor(asset.duration / 60)}:{(asset.duration % 60).toString().padStart(2, '0')}
             </Text>
           )}
@@ -58,5 +80,59 @@ const MediaItem: React.FC<MediaItemProps> = ({ asset, isSelected, onToggleSelect
     </TouchableOpacity>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    margin: 4,
+    aspectRatio: 1,
+    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
+  errorContainer: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectionIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedIndicator: {
+    backgroundColor: '#0066FF',
+  },
+  unselectedIndicator: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  videoIndicator: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  duration: {
+    color: 'white',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+});
 
 export default MediaItem; 

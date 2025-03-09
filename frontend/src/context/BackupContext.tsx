@@ -48,7 +48,7 @@ interface BackupContextType {
   selectedAssets: MediaAsset[];
   backupStats: BackupStats;
   backupProgress: BackupProgress;
-  loadNewAssets: () => Promise<void>;
+  loadNewAssets: (limit?: number, offset?: number) => Promise<boolean>;
   toggleAssetSelection: (id: string) => void;
   selectAllAssets: () => void;
   deselectAllAssets: () => void;
@@ -81,7 +81,7 @@ const BackupContext = createContext<BackupContextType>({
   selectedAssets: [],
   backupStats: initialBackupStats,
   backupProgress: initialBackupProgress,
-  loadNewAssets: async () => {},
+  loadNewAssets: async () => false,
   toggleAssetSelection: () => {},
   selectAllAssets: () => {},
   deselectAllAssets: () => {},
@@ -146,7 +146,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Function to load new assets from the device
-  const loadNewAssets = async () => {
+  const loadNewAssets = async (limit = 20, offset = 0) => {
     try {
       // Request media library permissions
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -159,14 +159,15 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             { text: 'Open Settings', onPress: () => Linking.openSettings() }
           ]
         );
-        return;
+        return false;
       }
 
-      // Get all assets
+      // Get all assets with pagination
       const fetchedAssets = await MediaLibrary.getAssetsAsync({
         mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
         sortBy: [['creationTime', false]],
-        first: 100 // Limit to most recent 100 for performance
+        first: limit,
+        after: offset > 0 ? offset.toString() : undefined
       });
 
       // Get detailed info for each asset
@@ -204,9 +205,15 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         })
       );
 
-      // Set all assets as new initially
-      setNewAssets(assetsData);
-      setSelectedAssets(assetsData);
+      // If this is the first page, replace the assets
+      // Otherwise, append the new assets
+      if (offset === 0) {
+        setNewAssets(assetsData);
+        setSelectedAssets(assetsData);
+      } else {
+        setNewAssets(prev => [...prev, ...assetsData]);
+        setSelectedAssets(prev => [...prev, ...assetsData]);
+      }
 
       // If server is reachable, check which assets need backup
       if (isServerReachable && settings.serverIP) {
@@ -232,37 +239,51 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (data.status === 'success') {
               const newFileIds = new Set(data.new_files.map((file: any) => file.id));
               const assetsToBackup = assetsData.filter(asset => newFileIds.has(asset.id));
-              setNewAssets(assetsToBackup);
-              setSelectedAssets(assetsToBackup);
+              
+              if (offset === 0) {
+                setNewAssets(assetsToBackup);
+                setSelectedAssets(assetsToBackup);
+              } else {
+                setNewAssets(prev => [...prev, ...assetsToBackup]);
+                setSelectedAssets(prev => [...prev, ...assetsToBackup]);
+              }
             }
           }
         } catch (error) {
           console.error('Failed to check new files:', error);
         }
       }
+
+      return fetchedAssets.hasNextPage;
     } catch (error) {
       console.error('Error loading assets:', error);
       Alert.alert('Error', 'Failed to load your photos and videos. Please try again.');
+      return false;
     }
   };
 
   // Function to toggle asset selection
   const toggleAssetSelection = (id: string) => {
+    const asset = newAssets.find(a => a.id === id);
+    if (!asset) return;
+
     setNewAssets(prevAssets =>
       prevAssets.map(asset => {
         if (asset.id === id) {
-          const newSelected = !asset.selected;
-          // Update selected assets array
-          if (newSelected) {
-            setSelectedAssets(prev => [...prev, asset]);
-          } else {
-            setSelectedAssets(prev => prev.filter(a => a.id !== id));
-          }
-          return { ...asset, selected: newSelected };
+          return { ...asset, selected: !asset.selected };
         }
         return asset;
       })
     );
+
+    setSelectedAssets(prev => {
+      const isCurrentlySelected = prev.some(a => a.id === id);
+      if (isCurrentlySelected) {
+        return prev.filter(a => a.id !== id);
+      } else {
+        return [...prev, asset];
+      }
+    });
   };
 
   // Function to select all assets
@@ -270,7 +291,8 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNewAssets(prevAssets =>
       prevAssets.map(asset => ({ ...asset, selected: true }))
     );
-    setSelectedAssets(newAssets);
+    // Use newAssets directly instead of the stale state
+    setSelectedAssets([...newAssets]);
   };
 
   // Function to deselect all assets
