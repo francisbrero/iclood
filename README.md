@@ -93,6 +93,7 @@ A local-only iCloud alternative for photo and video backups, designed for person
    The server will be accessible at `http://<your-ip>:8080`
 
 #### Production Setup (Raspberry Pi)
+
 1. Set up Python and PostgreSQL on your Raspberry Pi
    ```bash
    sudo apt update
@@ -137,25 +138,30 @@ A local-only iCloud alternative for photo and video backups, designed for person
    npm install -g expo-cli
    ```
 
-3. Navigate to the frontend directory and install dependencies
+3. Install EAS CLI globally
+   ```bash
+   npm install -g eas-cli
+   ```
+
+4. Navigate to the frontend directory and install dependencies
    ```bash
    cd iclood/frontend
    npm install
    ```
 
-4. Start the Expo development server
+5. Start the Expo development server
    ```bash
    npm start
    # or
    expo start
    ```
 
-5. Run on iOS
+6. Run on iOS
    - Install the Expo Go app on your iPhone from the App Store
    - Scan the QR code displayed in the terminal with your iPhone camera
    - Make sure your iPhone is on the same Wi-Fi network as your development machine
 
-6. Configure the app
+7. Configure the app
    - Once the app is running, go to the Settings tab
    - Tap "Configure Server" and enter your server's IP address
    - The default port is 8080 unless you changed it in your backend configuration
@@ -174,22 +180,7 @@ cd frontend
 npm test
 ```
 
-### Building for Production
-For deploying the frontend as a standalone app:
-```bash
-cd frontend
-expo build:ios
-# Follow the prompts to build your app
-```
+## Building for Production
 
-## Troubleshooting
-- If you can't connect to the server, make sure your iPhone and development machine are on the same Wi-Fi network
-- Check that the Flask server is running and accessible from other devices on your network
-- For macOS development: You may need to allow incoming connections through your firewall:
-  1. Go to System Settings -> Network -> Firewall
-  2. Click "Options..." or "Firewall Options..."
-  3. Either temporarily disable the firewall or add Python/Flask to the allowed apps
-- For production: verify that your Raspberry Pi's firewall allows connections on the port you're using (default: 8080)
-
-## Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
+Currently not available because of the cost of the Apple Developer account ($99/year).
+Thank you Tim Cook!

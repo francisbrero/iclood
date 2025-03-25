@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from . import db
 
 class Backup(db.Model):
@@ -13,7 +13,7 @@ class Backup(db.Model):
     file_type = db.Column(db.String, nullable=False)  # 'photo' or 'video'
     mime_type = db.Column(db.String, nullable=True)
     device_id = db.Column(db.String, nullable=True)  # For multiple devices tracking
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     status = db.Column(db.String, nullable=False, default='Pending')  # 'Pending', 'Completed', 'Failed'
     
     def __repr__(self):
