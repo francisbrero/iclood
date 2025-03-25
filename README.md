@@ -22,7 +22,7 @@ A local-only iCloud alternative for photo and video backups, designed for person
 #### Local Development (Mac)
 1. Clone the repository and navigate to the backend directory
    ```bash
-   git clone https://github.com/yourusername/iclood.git
+   git clone https://github.com/francisbrero/iclood.git
    cd iclood/backend
    ```
 
@@ -88,11 +88,17 @@ A local-only iCloud alternative for photo and video backups, designed for person
 
 7. Run the Flask application
    ```bash
+   # Run on default port 8080
    python run.py
+
+   # Or specify a custom port
+   python run.py -p 8081
    ```
-   The server will be accessible at `http://<your-ip>:8080`
+   The server will be accessible at `http://<your-ip>:8080` (or your specified port)
 
 #### Production Setup (Raspberry Pi)
+
+Start by following the instructions in the [RASPI.md](RASPI.md) file.
 
 1. Set up Python and PostgreSQL on your Raspberry Pi
    ```bash
@@ -103,13 +109,37 @@ A local-only iCloud alternative for photo and video backups, designed for person
 2. Follow steps 1-3 from the Local Development section
 
 3. Create a PostgreSQL database
+
+Give read & execute permissions to 'others' for the directory path
+   ```bash
+   sudo chmod o+rx /home/admin
+   sudo chmod o+rx /home/admin/iclood
+   sudo chmod o+rx /home/admin/iclood/backend
+   ```
+
+Create the database and user
    ```bash
    sudo -u postgres psql
-   postgres=# CREATE DATABASE iclood;
-   postgres=# CREATE USER iclooduser WITH PASSWORD 'yourpassword';
-   postgres=# GRANT ALL PRIVILEGES ON DATABASE iclood TO iclooduser;
-   postgres=# \q
    ```
+
+   ```sql 
+   CREATE DATABASE iclood;
+   CREATE USER iclooduser WITH PASSWORD 'iclood123';
+   GRANT ALL PRIVILEGES ON DATABASE iclood TO iclooduser;
+   
+   ```
+
+```sql
+-- Connect to the iclood database
+\c iclood
+
+-- Grant privileges
+GRANT ALL ON SCHEMA public TO iclooduser;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO iclooduser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO iclooduser;
+```
+
+Exit using `\q`
 
 4. Copy and configure the environment file
    ```bash
@@ -119,7 +149,7 @@ A local-only iCloud alternative for photo and video backups, designed for person
 
 5. Run the Flask application
    ```bash
-   python run.py
+   python run.py -p 8081
    ```
 
 ### Frontend Setup with Expo
