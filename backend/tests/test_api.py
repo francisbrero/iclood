@@ -2,36 +2,12 @@ import os
 import pytest
 import tempfile
 import shutil
-from datetime import datetime
+from datetime import datetime, UTC
 from app import create_app, db
 from app.models import Backup, IgnoredFile
 
-@pytest.fixture
-def app():
-    """Create and configure a test app instance"""
-    # Create a temporary directory for uploads
-    upload_dir = tempfile.mkdtemp()
-    
-    # Test config
-    app = create_app({
-        'TESTING': True,
-        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
-        'UPLOAD_FOLDER': upload_dir
-    })
-    
-    # Create tables
-    with app.app_context():
-        db.create_all()
-    
-    yield app
-    
-    # Cleanup
-    shutil.rmtree(upload_dir)
-
-@pytest.fixture
-def client(app):
-    """Test client"""
-    return app.test_client()
+# Import fixtures directly since they're now the default ones
+from conftest import app, client
 
 @pytest.fixture
 def runner(app):
@@ -46,6 +22,7 @@ def test_ping(client):
     assert json_data['status'] == 'success'
     assert json_data['message'] == 'iClood server is online'
 
+@pytest.mark.db
 def test_storage_status_empty(client):
     """Test storage status with no backups"""
     response = client.get('/storage/status')
@@ -60,6 +37,7 @@ def test_storage_status_empty(client):
     assert json_data['backups']['photo_count'] == 0
     assert json_data['backups']['video_count'] == 0
 
+@pytest.mark.db
 def test_new_photos_empty(client):
     """Test new photos endpoint with no files"""
     response = client.post('/photos/new', json={
@@ -72,6 +50,7 @@ def test_new_photos_empty(client):
     assert json_data['count'] == 0
     assert len(json_data['new_files']) == 0
 
+@pytest.mark.db
 def test_new_photos_with_files(client, app):
     """Test new photos endpoint with files"""
     # Add some backed up files to the database
@@ -117,6 +96,7 @@ def test_new_photos_with_files(client, app):
     assert len(json_data['new_files']) == 1
     assert json_data['new_files'][0]['path'] == '/path/to/new.jpg'
 
+@pytest.mark.db
 def test_backup_history_empty(client):
     """Test backup history with no backups"""
     response = client.get('/backup/history')
@@ -125,6 +105,7 @@ def test_backup_history_empty(client):
     assert json_data['status'] == 'success'
     assert len(json_data['history']) == 0
 
+@pytest.mark.db
 def test_backup_history_with_backups(client, app):
     """Test backup history with some backups"""
     # Add some test backups
@@ -139,7 +120,7 @@ def test_backup_history_with_backups(client, app):
                 mime_type='image/jpeg',
                 device_id='test_device',
                 status='Completed',
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(UTC)
             )
             for i in range(3)
         ]
@@ -162,6 +143,7 @@ def test_backup_history_with_backups(client, app):
     assert 'timestamp' in first_backup
     assert first_backup['status'] == 'Completed'
 
+@pytest.mark.db
 def test_ignore_files(client):
     """Test ignoring files"""
     response = client.post('/photos/ignore', json={
@@ -180,6 +162,7 @@ def test_ignore_files(client):
     assert json_data['status'] == 'success'
     assert json_data['ignored_count'] == 1
 
+@pytest.mark.db
 def test_upload_photo(client, app):
     """Test photo upload"""
     # Create a temporary test file
@@ -229,6 +212,7 @@ def test_error_handling(client):
     })
     assert response.status_code == 400
 
+@pytest.mark.db
 def test_storage_usage(client):
     """Test storage usage endpoint"""
     response = client.get('/storage/usage')
@@ -242,4 +226,83 @@ def test_storage_usage(client):
     assert json_data['total_bytes'] > 0
     assert json_data['available_bytes'] >= 0
     assert json_data['used_bytes'] >= 0
-    assert json_data['total_bytes'] >= json_data['used_bytes'] 
+    assert json_data['total_bytes'] >= json_data['used_bytes']
+
+@pytest.mark.db
+def test_backup_state_persistence(client, app):
+    """Test that backed up images are properly tracked in the database and not shown after reload"""
+    # Create a temporary test file
+    with tempfile.NamedTemporaryFile(suffix='.jpg') as tmp_file:
+        tmp_file.write(b'test image content')
+        tmp_file.seek(0)
+        
+        print("\nDebug: Starting file upload...")
+        # First, simulate uploading a photo
+        response = client.post(
+            '/photos/upload',
+            data={
+                'file': (tmp_file, 'test.jpg'),
+                'original_path': '/path/to/test.jpg',
+                'file_type': 'photo',
+                'device_id': 'test_device'
+            },
+            content_type='multipart/form-data'
+        )
+        
+        print(f"Debug: Upload response status: {response.status_code}")
+        print(f"Debug: Upload response data: {response.get_json()}")
+        
+        assert response.status_code == 201
+        json_data = response.get_json()
+        assert json_data['status'] == 'success'
+        
+        print("\nDebug: Checking if file is marked as backed up...")
+        # Now check if the file is marked as backed up by sending it in the "new files" check
+        response = client.post(
+            '/photos/new',
+            json={
+                'device_id': 'test_device',
+                'files': [{
+                    'id': 'test_id',
+                    'path': '/path/to/test.jpg',
+                    'name': 'test.jpg',
+                    'size': 100,
+                    'type': 'photo',
+                    'created': datetime.now(UTC).timestamp()
+                }]
+            }
+        )
+        
+        print(f"Debug: New files check response status: {response.status_code}")
+        print(f"Debug: New files check response data: {response.get_json()}")
+        
+        assert response.status_code == 200
+        json_data = response.get_json()
+        assert json_data['status'] == 'success'
+        # The file should not be in new_files since it's already backed up
+        assert len(json_data['new_files']) == 0
+        
+        print("\nDebug: Verifying backup in database...")
+        # Verify the backup exists in the database with Completed status
+        with app.app_context():
+            backup = Backup.query.filter_by(
+                original_path='/path/to/test.jpg',
+                device_id='test_device'
+            ).first()
+            print(f"Debug: Found backup in DB: {backup}")
+            assert backup is not None
+            assert backup.status == 'Completed'
+            
+            print("\nDebug: Checking storage status...")
+            # Also verify through the storage status endpoint
+            response = client.get('/storage/status')
+            print(f"Debug: Storage status response status: {response.status_code}")
+            print(f"Debug: Storage status response data: {response.get_json()}")
+            
+            assert response.status_code == 200
+            json_data = response.get_json()
+            assert json_data['status'] == 'success'
+            assert json_data['backups']['total_count'] == 1
+            assert json_data['backups']['photo_count'] == 1
+            
+        print("\nDebug: Test completed successfully")

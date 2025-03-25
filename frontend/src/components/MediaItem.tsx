@@ -9,6 +9,7 @@ interface MediaItemProps {
     uri: string;
     mediaType: 'photo' | 'video';
     duration?: number;
+    ignored?: boolean;
   };
   isSelected: boolean;
   onToggleSelection: () => void;
@@ -40,7 +41,7 @@ const MediaItem: React.FC<MediaItemProps> = ({ asset, isSelected, onToggleSelect
   
   return (
     <TouchableOpacity 
-      style={styles.container}
+      style={[styles.container, asset.ignored && styles.ignoredContainer]}
       onPress={onToggleSelection}
       activeOpacity={0.7}
     >
@@ -51,7 +52,7 @@ const MediaItem: React.FC<MediaItemProps> = ({ asset, isSelected, onToggleSelect
       ) : (
         <Image
           source={{ uri: imageUri }}
-          style={styles.image}
+          style={[styles.image, asset.ignored && styles.ignoredImage]}
           resizeMode="cover"
           onError={() => setImageError(true)}
         />
@@ -62,7 +63,7 @@ const MediaItem: React.FC<MediaItemProps> = ({ asset, isSelected, onToggleSelect
         {isSelected ? (
           <Ionicons name="checkmark" size={16} color="white" />
         ) : (
-          <Ionicons name="add" size={16} color="white" />
+          <Ionicons name={asset.ignored ? "eye-off" : "add"} size={16} color="white" />
         )}
       </View>
       
@@ -132,6 +133,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginLeft: 4,
+  },
+  ignoredContainer: {
+    opacity: 0.7,
+  },
+  ignoredImage: {
+    opacity: 0.7,
   },
 });
 

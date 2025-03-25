@@ -47,23 +47,21 @@ const HomeScreen: React.FC = () => {
   const [isWifiConnected, setIsWifiConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 20;
   
   // Check network and load initial assets when the screen is focused
   useEffect(() => {
     if (isFocused) {
-      setPage(1);
       setHasMore(true);
-      checkNetworkAndLoadAssets(1);
+      checkNetworkAndLoadAssets();
     }
   }, [isFocused]);
   
   // Check network and load assets
-  const checkNetworkAndLoadAssets = async (currentPage: number) => {
+  const checkNetworkAndLoadAssets = async (after?: string) => {
     try {
-      if (currentPage === 1) {
+      if (!after) {
         setIsLoading(true);
       }
       
@@ -77,7 +75,7 @@ const HomeScreen: React.FC = () => {
       }
       
       // Load new assets with pagination
-      const hasNextPage = await loadNewAssets(ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE);
+      const hasNextPage = await loadNewAssets(ITEMS_PER_PAGE, after);
       setHasMore(hasNextPage);
     } catch (error) {
       console.error('Error checking network:', error);
@@ -90,27 +88,39 @@ const HomeScreen: React.FC = () => {
   // Handle pull-to-refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    setPage(1);
     setHasMore(true);
-    await checkNetworkAndLoadAssets(1);
+    await checkNetworkAndLoadAssets();
     setIsRefreshing(false);
   };
   
   // Handle loading more items
   const handleLoadMore = async () => {
-    if (!isLoadingMore && hasMore && !isLoading) {
-      setIsLoadingMore(true);
-      const nextPage = page + 1;
-      setPage(nextPage);
-      await checkNetworkAndLoadAssets(nextPage);
+    if (!isLoadingMore && hasMore && !isLoading && newAssets.length > 0) {
+      try {
+        setIsLoadingMore(true);
+        const lastAsset = newAssets[newAssets.length - 1];
+        const hasNextPage = await checkNetworkAndLoadAssets(lastAsset.id);
+        setHasMore(Boolean(hasNextPage));
+      } finally {
+        setIsLoadingMore(false);
+      }
     }
   };
   
   // Render footer loader
   const renderFooter = () => {
-    if (!isLoadingMore) return null;
+    if (!isLoadingMore) {
+      if (!hasMore && newAssets.length > 0) {
+        return (
+          <View style={styles.footerContainer}>
+            <Text style={styles.footerText}>No more photos to load</Text>
+          </View>
+        );
+      }
+      return null;
+    }
     return (
-      <View style={{ paddingVertical: 20 }}>
+      <View style={styles.footerContainer}>
         <ActivityIndicator size="large" color="#0066FF" />
       </View>
     );
@@ -189,6 +199,26 @@ const HomeScreen: React.FC = () => {
       );
     }
     
+    if (!isWifiConnected || !settings.serverIP || !isServerReachable) {
+      return (
+        <View style={styles.centerContainer}>
+          <Ionicons name="cloud-offline" size={64} color="#64748B" />
+          <Text style={styles.emptyTitle}>
+            Connect to your server
+          </Text>
+          <Text style={styles.emptySubtext}>
+            Make sure you're connected to Wi-Fi and your server is running.
+          </Text>
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={handleRefresh}
+          >
+            <Text style={styles.refreshButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    
     return (
       <View style={styles.centerContainer}>
         <Ionicons name="checkmark-circle" size={64} color="#2ecc71" />
@@ -202,7 +232,7 @@ const HomeScreen: React.FC = () => {
           style={styles.refreshButton}
           onPress={handleRefresh}
         >
-          <Text style={styles.refreshButtonText}>Refresh</Text>
+          <Text style={styles.refreshButtonText}>Check Again</Text>
         </TouchableOpacity>
       </View>
     );
@@ -440,6 +470,14 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  footerContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#64748B',
+    fontSize: 14,
   },
 });
 

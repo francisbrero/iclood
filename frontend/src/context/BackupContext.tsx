@@ -19,6 +19,7 @@ interface MediaAsset {
   width: number;
   height: number;
   selected?: boolean;
+  ignored?: boolean;
 }
 
 interface BackupStats {
@@ -48,7 +49,7 @@ interface BackupContextType {
   selectedAssets: MediaAsset[];
   backupStats: BackupStats;
   backupProgress: BackupProgress;
-  loadNewAssets: (limit?: number, offset?: number) => Promise<boolean>;
+  loadNewAssets: (limit?: number, after?: string) => Promise<boolean>;
   toggleAssetSelection: (id: string) => void;
   selectAllAssets: () => void;
   deselectAllAssets: () => void;
@@ -146,7 +147,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Function to load new assets from the device
-  const loadNewAssets = async (limit = 20, offset = 0) => {
+  const loadNewAssets = async (limit = 20, after?: string) => {
     try {
       // Request media library permissions
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -167,7 +168,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
         sortBy: [['creationTime', false]],
         first: limit,
-        after: offset > 0 ? offset.toString() : undefined
+        after
       });
 
       // Get detailed info for each asset
@@ -207,7 +208,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // If this is the first page, replace the assets
       // Otherwise, append the new assets
-      if (offset === 0) {
+      if (after === undefined) {
         setNewAssets(assetsData);
         setSelectedAssets(assetsData);
       } else {
@@ -238,15 +239,26 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const data = await response.json();
             if (data.status === 'success') {
               const newFileIds = new Set(data.new_files.map((file: any) => file.id));
-              const assetsToBackup = assetsData.filter(asset => newFileIds.has(asset.id));
+              const ignoredFileIds = new Set(data.ignored_files?.map((file: any) => file.id) || []);
               
-              if (offset === 0) {
-                setNewAssets(assetsToBackup);
-                setSelectedAssets(assetsToBackup);
+              // Only keep files that need backup (not backed up and not ignored)
+              const assetsToShow = assetsData.filter(asset => 
+                newFileIds.has(asset.id) && !ignoredFileIds.has(asset.id)
+              ).map(asset => ({
+                ...asset,
+                selected: true
+              }));
+              
+              if (after === undefined) {
+                setNewAssets(assetsToShow);
+                setSelectedAssets(assetsToShow);
               } else {
-                setNewAssets(prev => [...prev, ...assetsToBackup]);
-                setSelectedAssets(prev => [...prev, ...assetsToBackup]);
+                setNewAssets(prev => [...prev, ...assetsToShow]);
+                setSelectedAssets(prev => [...prev, ...assetsToShow]);
               }
+
+              // Return hasNextPage only if we got some assets to show
+              return fetchedAssets.hasNextPage && assetsToShow.length > 0;
             }
           }
         } catch (error) {
@@ -389,7 +401,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setBackupProgress(initialBackupProgress);
     
     // Refresh backup stats
-    fetchBackupStats();
+    await fetchBackupStats();
     
     // Show completion alert
     Alert.alert(
@@ -397,8 +409,10 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       `Successfully backed up ${successCount} files. ${failedCount > 0 ? `Failed to backup ${failedCount} files.` : ''}`
     );
     
-    // Refresh asset list
-    loadNewAssets();
+    // Reset page and reload assets
+    setNewAssets([]);
+    setSelectedAssets([]);
+    await loadNewAssets();
   };
 
   // Function to cancel ongoing backup

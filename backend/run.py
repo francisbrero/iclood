@@ -3,7 +3,7 @@ import logging
 from werkzeug.serving import run_simple
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
 app = create_app()
