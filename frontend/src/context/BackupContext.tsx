@@ -104,6 +104,18 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [backupProgress, setBackupProgress] = useState<BackupProgress>(initialBackupProgress);
   const [cancelBackupFlag, setCancelBackupFlag] = useState<boolean>(false);
 
+  // Helper function to format server URL
+  const getServerUrl = () => {
+    let url = settings.serverIP;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `http://${url}`;
+    }
+    if (!url.includes(':' + settings.serverPort)) {
+      url = `${url}:${settings.serverPort}`;
+    }
+    return url;
+  };
+
   // Load backup stats from server when server is reachable
   useEffect(() => {
     if (isServerReachable) {
@@ -118,7 +130,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/storage/status`, {
+      const response = await fetch(`${getServerUrl()}/storage/status`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +231,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // If server is reachable, check which assets need backup
       if (isServerReachable && settings.serverIP) {
         try {
-          const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/photos/new`, {
+          const response = await fetch(`${getServerUrl()}/photos/new`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -378,7 +390,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         formData.append('device_id', Device.modelName || 'unknown');
 
         // Upload the file
-        const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/photos/upload`, {
+        const response = await fetch(`${getServerUrl()}/photos/upload`, {
           method: 'POST',
           headers: {
             'Content-Type': 'multipart/form-data',
@@ -432,7 +444,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const assetsToIgnore = newAssets.filter(asset => assetIds.includes(asset.id));
 
       // Send ignore request to server
-      const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/photos/ignore`, {
+      const response = await fetch(`${getServerUrl()}/photos/ignore`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -463,7 +475,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       throw new Error('Server is not reachable');
     }
 
-    const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/storage/usage`, {
+    const response = await fetch(`${getServerUrl()}/storage/usage`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -489,7 +501,7 @@ export const BackupProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/backup/history`, {
+      const response = await fetch(`${getServerUrl()}/backup/history`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

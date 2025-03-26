@@ -3,6 +3,7 @@
 ## Prerequisites
 
 We assume you have a Raspberry Pi running with the latest version of Raspberry Pi OS.
+We also recommend having a GPIO connected screen.
 
 ## Networking
 
@@ -27,3 +28,6 @@ If you can connect, you're good to go.
 ## Using the Pi as a web gallery
 
 Check out pigallery2 [here](https://github.com/bpatrik/pigallery2).
+
+## GPIO screen
+

@@ -104,19 +104,21 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     try {
-      // Check if we're on Wi-Fi
-      const networkState = await Network.getNetworkStateAsync();
-      if (!networkState.isConnected || networkState.type !== Network.NetworkStateType.WIFI) {
-        setIsServerReachable(false);
-        return false;
-      }
-
       // Create AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
 
+      // Format the URL correctly
+      let url = settings.serverIP;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = `http://${url}`;
+      }
+      if (!url.includes(':' + settings.serverPort)) {
+        url = `${url}:${settings.serverPort}`;
+      }
+
       // Ping the server
-      const response = await fetch(`http://${settings.serverIP}:${settings.serverPort}/ping`, {
+      const response = await fetch(`${url}/ping`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
