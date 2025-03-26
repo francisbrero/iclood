@@ -151,6 +151,7 @@ Exit using `\q`
    ```bash
    python run.py -p 8081
    ```
+Note: if you use a different port, you will need to add a forward rule on the router.
 
 ### Frontend Setup with Expo
 
@@ -159,42 +160,44 @@ Exit using `\q`
    # On macOS with Homebrew
    brew install node
    
-   # On Windows
-   # Download from https://nodejs.org/
+   # On linux (raspberry pi)
+   sudo apt install nodejs npm
    ```
 
-2. Install Expo CLI globally
-   ```bash
-   npm install -g expo-cli
-   ```
-
-3. Install EAS CLI globally
-   ```bash
-   npm install -g eas-cli
-   ```
-
-4. Navigate to the frontend directory and install dependencies
+2. Navigate to the frontend directory and install dependencies
    ```bash
    cd iclood/frontend
    npm install
    ```
 
-5. Start the Expo development server
+Note: if npm fails to install, try using yarn instead.
+
+3. Start the Expo development server
    ```bash
-   npm start
-   # or
-   expo start
+   npx expo start
    ```
 
-6. Run on iOS
+   If you want to run the app on a different device, you can use the tunnel feature.
+   ```bash
+   npx expo start --tunnel
+   ```
+
+4. Run on iOS
    - Install the Expo Go app on your iPhone from the App Store
    - Scan the QR code displayed in the terminal with your iPhone camera
    - Make sure your iPhone is on the same Wi-Fi network as your development machine
 
-7. Configure the app
+5. Configure the app
    - Once the app is running, go to the Settings tab
-   - Tap "Configure Server" and enter your server's IP address
+   - Tap "Configure Server" and enter your server's IP address:
+     - For same network: use local IP (e.g., `192.168.1.100`)
+     - For different network: use your public IP and set up port forwarding:
+       1. Find your public IP at https://whatismyip.com
+       2. Set up port forwarding on your router for port 8080 (or your custom port)
+       3. Use `http://your.public.ip:8080`
+       4. Consider using a dynamic DNS service if your public IP changes frequently
    - The default port is 8080 unless you changed it in your backend configuration
+   - Test the connection by tapping "Test Connection" in the app
 
 ## Development
 

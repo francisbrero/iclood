@@ -56,14 +56,16 @@ const ServerSetupScreen: React.FC = () => {
     Keyboard.dismiss();
     
     if (!serverIP) {
-      Alert.alert('Error', 'Please enter a server IP address');
+      Alert.alert('Error', 'Please enter a server address');
       return;
     }
     
-    // Validate IP format
-    const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-    if (!ipRegex.test(serverIP)) {
-      Alert.alert('Error', 'Please enter a valid IP address (e.g., 192.168.1.10)');
+    // Allow URLs, hostnames, and IP addresses
+    const urlPattern = /^(https?:\/\/)?([a-zA-Z0-9.-]+)(:\d+)?$/;
+    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+    
+    if (!urlPattern.test(serverIP) && !ipPattern.test(serverIP)) {
+      Alert.alert('Error', 'Please enter a valid server address (e.g., 192.168.1.10, example.com, or http://example.com)');
       return;
     }
     
@@ -95,7 +97,7 @@ const ServerSetupScreen: React.FC = () => {
       } else {
         Alert.alert(
           'Connection Failed',
-          'Could not connect to the server. Please check the IP address, port, and make sure your server is running and you are on the same network.',
+          'Could not connect to the server. Please check the address, port, and make sure your server is running.',
           [{ text: 'OK' }]
         );
       }
@@ -129,26 +131,28 @@ const ServerSetupScreen: React.FC = () => {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Server Setup</Text>
             <Text style={styles.cardDescription}>
-              Configure your home server's IP address and port to enable secure photo backup.
+              Configure your server's address and port to enable secure photo backup.
             </Text>
 
             <View style={styles.ipBox}>
               <Ionicons name="information-circle" size={20} color="#3498db" />
               <Text style={styles.ipBoxText}>
-                Make sure your device is connected to the same network as your server.
+                Enter your server's IP address, hostname, or URL.
               </Text>
             </View>
           </View>
           
           {/* Server Settings */}
           <View style={styles.card}>
-            <Text style={styles.inputLabel}>Server IP Address</Text>
+            <Text style={styles.inputLabel}>Server Address</Text>
             <TextInput
               style={styles.input}
               value={serverIP}
               onChangeText={setServerIP}
-              placeholder="e.g. 192.168.1.100"
-              keyboardType="numeric"
+              placeholder="e.g. 192.168.1.100 or example.com"
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
             />
             
             {/* IP Suggestions */}
