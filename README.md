@@ -147,6 +147,9 @@ Exit using `\q`
    # Edit .env with your database credentials and storage path
    ```
 
+Note: if you are using an external HDD, you will need to change the storage path in the environment file. Mine is `/mnt/media`
+run `lsblk` to find the path to your HDD.
+
 5. Run the Flask application
    ```bash
    python run.py -p 8081

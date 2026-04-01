@@ -15,6 +15,13 @@ Connect to your router and set up a static IP address.
 
 Add new port forwarding rules to your router to forward ports 8080 and 22 to the Raspberry Pi.
 
+```bash
+sudo ufw allow 8080
+sudo ufw allow 22
+sudo ufw allow ANY_PORT_YOU_USE
+sudo ufw reload
+```
+
 ### Test connection
 
 Connect to the Raspberry Pi using SSH.
